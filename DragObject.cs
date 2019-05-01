@@ -5,17 +5,15 @@ using UnityEngine;
 public class DragObject : MonoBehaviour
 {
 
-    Rigidbody rb;
-    private Vector3 mousePosition;                     // used for translating screen coords to world coords                   
+    private Vector3 roundedX;
+    private Vector3 rounded_Z;
+
+
+    private Vector3 offset;                     // used for translating screen coords to world coords
     private Vector3 screenPoint;
-    Vector3 cube_mouse_dist;
-
-
 
     public enum Direction { x_axis, z_axis };       // creates a drop-down menu in the object inspector to switch between x and z dragging; sets z to default.
     public Direction dropdown = Direction.z_axis;
-
-
 
     const float MIN_X = -1.0f;                      // outer limits of the board in my game world
     const float MAX_X = 1.0f;
@@ -23,32 +21,26 @@ public class DragObject : MonoBehaviour
     const float MIN_Z = -1.5f;
     const float MAX_Z = 0.5f;
 
-
-
     private bool dragging = true;       // enables dragging and sets solved to false
     private bool solved = false;
 
 
-
-
-
-
     void Start()
     {
-        rb = GetComponent<Rigidbody>();
+        roundedX = this.transform.position;
+        rounded_Z = this.transform.position;
     }
-
- 
-
 
 
 
 
     void OnMouseDown()
     {
-        screenPoint = Camera.main.WorldToScreenPoint(transform.position);  // converts screen coords to world coords
+        screenPoint = Camera.main.WorldToScreenPoint(transform.position);   // converts screen coords to world coords
+        offset = transform.position - Camera.main.ScreenToWorldPoint(new Vector3(Input.mousePosition.x, Input.mousePosition.y, screenPoint.z));
         dragging = true;
     }
+
 
 
 
@@ -61,50 +53,53 @@ public class DragObject : MonoBehaviour
         {
 
             Vector3 curScreenPoint = new Vector3(Input.mousePosition.x, Input.mousePosition.y, screenPoint.z);
-            mousePosition = Camera.main.ScreenToWorldPoint(curScreenPoint);
+            Vector3 curPosition = Camera.main.ScreenToWorldPoint(curScreenPoint) + offset;
 
-            if (dropdown == Direction.z_axis)      
+            if (dropdown == Direction.z_axis)       // for some reason z and x are reversed but it works
             {
-                cube_mouse_dist = new Vector3(0, 0, mousePosition.z - transform.position.z);
+                curPosition.x = transform.position.x;
 
+                if (curPosition.z < MIN_Z)          // keeps cubes within board area
+                    curPosition.z = MIN_Z;
 
-
-
-                if (mousePosition.z < MIN_Z)          // keeps cubes within board area
-                    mousePosition.z = MIN_Z;
-
-                if (mousePosition.z > MAX_Z)
-                    mousePosition.z = MAX_Z;
+                if (curPosition.z > MAX_Z)
+                    curPosition.z = MAX_Z;
             }
 
 
 
             if (dropdown == Direction.x_axis)
             {
-
-                cube_mouse_dist = new Vector3(mousePosition.x - transform.position.x, 0, 0);
-
+                curPosition.z = transform.position.z;
 
 
-                if (mousePosition.x < MIN_X)          // keeps cubes within board area
-                    mousePosition.x = MIN_X;
+
+                if (curPosition.x < MIN_X)          // keeps cubes within board area
+                    curPosition.x = MIN_X;
 
                 if (!solved)
                 {
-                    if (mousePosition.x > MAX_X)      // if the puzzle is solved, let the target cube slide out
-                        mousePosition.x = MAX_X;
+                    if (curPosition.x > MAX_X)      // if the puzzle is solved, let the target cube slide out
+                        curPosition.x = MAX_X;
                 }
+
+                
             }
 
-        
 
-            
-            rb.velocity = cube_mouse_dist * 20;
-
+            transform.position = curPosition;
         }
 
-    }        
-    
+        if (!dragging)                              // If collision was detected, set the block back to the last integer value.
+        {
+            if (dropdown == Direction.x_axis)
+                transform.position = roundedX;
+
+            if (dropdown == Direction.z_axis)
+                transform.position = rounded_Z;
+        }
+    }
+
 
 
 
@@ -126,17 +121,22 @@ public class DragObject : MonoBehaviour
             if (Mathf.Abs(upper - curZ) < Mathf.Abs(lower - curZ))
             {
                 this.transform.position = new Vector3(this.transform.position.x, this.transform.position.y, upper);
+                rounded_Z = transform.position;
             }
 
             else if (Mathf.Abs(upper - curZ) >= Mathf.Abs(lower - curZ))
             {
                 this.transform.position = new Vector3(this.transform.position.x, this.transform.position.y, lower);
+                rounded_Z = transform.position;
             }
 
         }
 
         if (dropdown == Direction.x_axis)
+        {
             this.transform.position = new Vector3(Mathf.Round(this.transform.position.x), this.transform.position.y, this.transform.position.z);
+            roundedX = transform.position;
+        }
 
         dragging = true;
     }
@@ -149,10 +149,8 @@ public class DragObject : MonoBehaviour
 
 
 
-
     void OnCollisionEnter(Collision col)
     {
-
         if (col.gameObject.tag == "Cube")   // if your cube hits another cube, disable the ability to drag.
         {
             dragging = false;
@@ -163,6 +161,4 @@ public class DragObject : MonoBehaviour
             solved = true;
         }
     }
-
-    
 }
